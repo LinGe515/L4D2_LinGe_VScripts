@@ -773,23 +773,9 @@ local isExistTime = false;
 	}
 }
 
-::LinGe.HUD.GetPlayerBakHurtData <- function (player)
-{
-	if (typeof player != "instance")
-		throw "player 类型非法";
-	if (!player.IsValid())
-		return null;
-	if (player.GetNetworkIDString() == "BOT")
-		return null;
-	local id = ::LinGe.SteamIDCastUniqueID(player.GetNetworkIDString());
-	if (!hurtData_bak.rawin(id))
-		return null;
-	return hurtData_bak[id];
-}
-
 ::LinGe.HUD.On_cache_restore <- function (params)
 {
-	// 将HurtData_bak中的非累计数据置为0
+	// 将 hurtData_bak 中的非累计数据置为0，将 o_ 全部更新为 t_
 	foreach (id, d in hurtData_bak)
 	{
 		if (!d.rawin("hsi")) // Cache 还原后，小写h总是会被改写为大写H，大坑
@@ -797,28 +783,34 @@ local isExistTime = false;
 		if (!d.rawin("hci"))
 			d.hci <- 0;
 		foreach (key in item_key)
+		{
 			d[key] = 0;
+			d["o_" + key] = d["t_" + key];
+		}
 		d.tank = 0;
 	}
 
 	// 初始化 hurtData
 	for (local i=0; i<=32; i++)
 	{
-		local d = clone hurtDataTemplate;
-		hurtData.append(d);
-
-		local player = PlayerInstanceFromIndex(i);
-		if (player && player.IsValid() && 3 != ::LinGe.GetPlayerTeam(player)
-		&& params.isValidCache)
+		hurtData.append(clone hurtDataTemplate);
+	}
+	
+	// 如果 cache 有效，则从 hurtData_bak 中恢复
+	// 仅当前关卡失败时，玩家数据会被从此处恢复
+	// 若是关卡成功，此时还不能获取到 player instance，但后续会触发player_team，从而恢复
+	if (params.isValidCache)
+	{
+		for (local i=0; i<=32; i++)
 		{
-			local last_data = GetPlayerBakHurtData(player);
-			if (last_data)
+			local player = PlayerInstanceFromIndex(i);
+			if (player && player.IsValid() && 3 != ::LinGe.GetPlayerTeam(player)
+			&& player.GetNetworkIDString() != "BOT")
 			{
-				foreach (key in item_key)
-				{
-					d["t_" + key] = last_data["t_" + key];
-					d["o_" + key] = d["t_" + key];
-				}
+				local id = ::LinGe.SteamIDCastUniqueID(player.GetNetworkIDString());
+				if (!hurtData_bak.rawin(id))
+					continue;
+				hurtData[i] = hurtData_bak[id];
 			}
 		}
 	}
