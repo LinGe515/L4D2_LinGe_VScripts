@@ -931,30 +931,18 @@ local isExistTime = false;
 	// 如果被攻击者是生还者则统计友伤数据
 	if (victim.IsSurvivor())
 	{
-	        printl("dying " + victim.IsDying())
-	        printl("dead " + victim.IsDead())
-	        printl("incapacitated " + victim.IsIncapacitated())
-	        printl("dmg " + dmg)
-	        printl("vhp " + vctHp)
-	        printl("health " + params.health)
-		if (victim.IsDying() || victim.IsDead())
+		if (victim.IsDying() || victim.IsDead() || victim.IsIncapacitated())
 			return;
-		else if (vctHp < 0) // 致死伤害事件发生时，victim.IsDead()还不会为真，但血量会<0
+		vctHp += victim.GetHealthBuffer().tointeger();
+		if (vctHp < 0) // 致死伤害事件发生时，victim.IsDead()还不会为真，但血量会<0
 		{
-			// 如果是本次伤害致其死亡，则 生命值 + 伤害值 > 0
-			if (vctHp + dmg <= 0)
+			// 修正致死溢出伤害
+			dmg += vctHp;
+			if (dmg <= 0)
 				return;
 		}
-		else if (victim.IsIncapacitated())
-		{
-			// 如果是本次伤害致其倒地，则其当前血量+伤害量=300
-			// 如果不是，则说明攻击时已经倒地，则不统计本次友伤
-            		// **这里逻辑不对，注掉
-			// if (vctHp + dmg != 300)
-			// 	return;
-		}
 
-		// 若不是对自己造成的伤害，则计入累计统计
+		// 若不是对自己造成的伤害，则计入友伤累计统计
 		if (attacker != victim)
 		{
 			hurtData[attacker.GetEntityIndex()].atk += dmg;
@@ -989,19 +977,18 @@ local isExistTime = false;
 		else // 不是生还者且不是Tank，则为普通特感(此事件下不可能为witch)
 		{
 			if (vctHp < 0)
-				dmg += vctHp; // 修正溢出伤害
+			{
+				// 修正致死溢出伤害
+				dmg += vctHp;
+				if (dmg <= 0)
+					return;
+			}
 			hurtData[attacker.GetEntityIndex()].si += dmg;
 			hurtData[attacker.GetEntityIndex()].t_si += dmg;
 		}
 	}
 }
 ::LinEventHook("OnGameEvent_player_hurt", ::LinGe.HUD.OnGameEvent_player_hurt, ::LinGe.HUD);
-/*	Tank的击杀伤害与致队友倒地时的伤害存在溢出
-	没能发现太好修正方法，因为当上述两种情况发生时
-	已经无法获得其最后一刻的真实血量
-	除非时刻记录Tank和队友的血量，然后以此为准编写一套逻辑
-	但这样实在太浪费资源，且容易出现BUG
-*/
 
 // 提示一次友伤伤害并删除累积数据
 ::LinGe.HUD.Timer_PrintTeamHurt <- function (key)
@@ -1151,20 +1138,20 @@ local isExistTime = false;
 
 	local attacker = null;
 	if (params.rawin("attacker")) // 如果是小丧尸或Witch等使玩家倒地，则无attacker
-        	attacker = GetPlayerFromUserID(params.attacker);
-    	if (null == attacker) // 攻击者无效
+        attacker = GetPlayerFromUserID(params.attacker);
+	if (null == attacker) // 攻击者无效
 		return;
 	if (!attacker.IsSurvivor()) // 攻击者不是生还者
 		return;
 
-    	// 获取被攻击者实体
+    // 获取被攻击者实体
 	local victim = GetPlayerFromUserID(params.userid);
 	local vctHp = victim.GetHealth() + victim.GetHealthBuffer().tointeger();
 	local dmg = vctHp; // 伤害直接取被攻击者剩余hp
 
 	if (victim.IsSurvivor())
 	{
-        	// 若不是对自己造成的伤害，则计入累计统计
+        // 若不是对自己造成的伤害，则计入累计统计
 		if (attacker != victim)
 		{
 			hurtData[attacker.GetEntityIndex()].atk += dmg;
@@ -1177,7 +1164,7 @@ local isExistTime = false;
 		if (Config.hurt.teamHurtInfo >= 1 && Config.hurt.teamHurtInfo <= 2)
 		{
 			local key = params.attacker + "_" + params.userid;
-            		if (!tempTeamHurt.rawin(key))
+            if (!tempTeamHurt.rawin(key))
 			{
 				tempTeamHurt[key] <- { dmg=0, attacker=attacker, atkName=attacker.GetPlayerName(),
 					victim=victim, vctName=victim.GetPlayerName(), isDead=false, isIncap=false };
@@ -1191,29 +1178,27 @@ local isExistTime = false;
 }
 ::LinEventHook("OnGameEvent_player_incapacitated_start", ::LinGe.HUD.OnGameEvent_player_incapacitated_start, ::LinGe.HUD);
 
-// 事件：玩家倒地（处理tank）
+// 事件：玩家倒地（仅处理tank死亡的致死伤害）
 ::LinGe.HUD.OnGameEvent_player_incapacitated <- function (params)
 {
 	if (!params.rawin("userid") || params.userid == 0)
 		return;
 
 	local attacker = null;
-	if (params.rawin("attacker")) // 如果是小丧尸或Witch等使玩家倒地，则无attacker
-        	attacker = GetPlayerFromUserID(params.attacker);
-    	if (null == attacker) // 攻击者无效
+	if (params.rawin("attacker"))
+        attacker = GetPlayerFromUserID(params.attacker);
+    if (null == attacker) // 攻击者无效
 		return;
 	if (!attacker.IsSurvivor()) // 攻击者不是生还者
 		return;
 
 	local victim = GetPlayerFromUserID(params.userid);
-    	local vctHp = victim.GetHealth();
+	if (8 != victim.GetZombieType())
+		return;
+    local vctHp = victim.GetHealth();
 	local dmg = vctHp; // 伤害直接取被攻击者剩余hp
 	
-    // 如果是Tank 则将数据记录到临时Tank伤害数据记录
-    if (8 == victim.GetZombieType())
-    {
-        hurtData[attacker.GetEntityIndex()].tank += dmg;
-    }
+    hurtData[attacker.GetEntityIndex()].tank += dmg;
 }
 ::LinEventHook("OnGameEvent_player_incapacitated", ::LinGe.HUD.OnGameEvent_player_incapacitated, ::LinGe.HUD);
 
