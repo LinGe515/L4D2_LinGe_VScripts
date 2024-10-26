@@ -934,12 +934,14 @@ local isExistTime = false;
 		if (victim.IsDying() || victim.IsDead() || victim.IsIncapacitated())
 			return;
 		vctHp += victim.GetHealthBuffer().tointeger();
+		local isDead = false;
 		if (vctHp < 0) // 致死伤害事件发生时，victim.IsDead()还不会为真，但血量会<0
 		{
 			// 修正致死溢出伤害
 			dmg += vctHp;
 			if (dmg <= 0)
 				return;
+			isDead = true;
 		}
 
 		// 若不是对自己造成的伤害，则计入友伤累计统计
@@ -958,8 +960,9 @@ local isExistTime = false;
 			if (!tempTeamHurt.rawin(key))
 			{
 				tempTeamHurt[key] <- { dmg=0, attacker=attacker, atkName=attacker.GetPlayerName(),
-					victim=victim, vctName=victim.GetPlayerName(), isDead=false, isIncap=false };
+					victim=victim, vctName=victim.GetPlayerName(), isDead=false, isIncap=false  };
 			}
+			tempTeamHurt[key].isDead = isDead;
 			tempTeamHurt[key].dmg += dmg;
 			// 友伤发生后，0.5秒内同一人若未再对同一人造成友伤，则输出其造成的伤害
 			VSLib.Timers.AddTimerByName(key, 0.5, false, Timer_PrintTeamHurt, key);
@@ -1087,45 +1090,31 @@ local isExistTime = false;
 	attackerEntity = GetPlayerFromUserID(attacker);
 
 	if (dierEntity && dierEntity.IsSurvivor())
-	{
-		// 自杀时伤害类型为0
-		if (params.type == 0)
-			return;
+		return;
 
-		// 如果是友伤致其死亡
-		if (attackerEntity && attackerEntity.IsSurvivor())
-		{
-			local key = params.attacker + "_" + dier;
-			if (tempTeamHurt.rawin(key))
-				tempTeamHurt[key].isDead = true;
-		}
-	}
-	else
+	if (attackerEntity && attackerEntity.IsSurvivor())
 	{
-		if (attackerEntity && attackerEntity.IsSurvivor())
+		if (params.victimname == "Infected")
 		{
-			if (params.victimname == "Infected")
+			hurtData[attackerEntity.GetEntityIndex()].kci++;
+			hurtData[attackerEntity.GetEntityIndex()].t_kci++;
+			if (params.headshot)
 			{
-				hurtData[attackerEntity.GetEntityIndex()].kci++;
-				hurtData[attackerEntity.GetEntityIndex()].t_kci++;
-				if (params.headshot)
-				{
-					hurtData[attackerEntity.GetEntityIndex()].hci++;
-					hurtData[attackerEntity.GetEntityIndex()].t_hci++;
-				}
+				hurtData[attackerEntity.GetEntityIndex()].hci++;
+				hurtData[attackerEntity.GetEntityIndex()].t_hci++;
 			}
-			else
-			{
-				hurtData[attackerEntity.GetEntityIndex()].ksi++;
-				hurtData[attackerEntity.GetEntityIndex()].t_ksi++;
-				if (params.headshot)
-				{
-					hurtData[attackerEntity.GetEntityIndex()].hsi++;
-					hurtData[attackerEntity.GetEntityIndex()].t_hsi++;
-				}
-			}
-			// UpdateRankHUD();
 		}
+		else
+		{
+			hurtData[attackerEntity.GetEntityIndex()].ksi++;
+			hurtData[attackerEntity.GetEntityIndex()].t_ksi++;
+			if (params.headshot)
+			{
+				hurtData[attackerEntity.GetEntityIndex()].hsi++;
+				hurtData[attackerEntity.GetEntityIndex()].t_hsi++;
+			}
+		}
+		// UpdateRankHUD();
 	}
 }
 ::LinEventHook("OnGameEvent_player_death", ::LinGe.HUD.OnGameEvent_player_death, ::LinGe.HUD);
