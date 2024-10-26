@@ -795,7 +795,7 @@ local isExistTime = false;
 	{
 		hurtData.append(clone hurtDataTemplate);
 	}
-	
+
 	// 如果 cache 有效，则从 hurtData_bak 中恢复
 	// 仅当前关卡失败时，玩家数据会被从此处恢复
 	// 若是关卡成功，此时还不能获取到 player instance，但后续会触发player_team，从而恢复
@@ -916,7 +916,7 @@ local isExistTime = false;
 	if (params.dmg_health < 1)
 		return;
 
-	if (0 == params.type) // 伤害类型为0
+	if (0 == params.type || 131072 == params.type) // 伤害类型为0或131072（tank倒地自损）
 		return;
 	local attacker = GetPlayerFromUserID(params.attacker); // 获得攻击者实体
 	if (null == attacker) // 攻击者无效
@@ -931,23 +931,20 @@ local isExistTime = false;
 	// 如果被攻击者是生还者则统计友伤数据
 	if (victim.IsSurvivor())
 	{
-		if (victim.IsDying() || victim.IsDead())
+		if (victim.IsDying() || victim.IsDead() || victim.IsIncapacitated())
 			return;
-		else if (vctHp < 0) // 致死伤害事件发生时，victim.IsDead()还不会为真，但血量会<0
+		vctHp += victim.GetHealthBuffer().tointeger();
+		local isDead = false;
+		if (vctHp < 0) // 致死伤害事件发生时，victim.IsDead()还不会为真，但血量会<0
 		{
-			// 如果是本次伤害致其死亡，则 生命值 + 伤害值 > 0
-			if (vctHp + dmg <= 0)
+			// 修正致死溢出伤害
+			dmg += vctHp;
+			if (dmg <= 0)
 				return;
-		}
-		else if (victim.IsIncapacitated())
-		{
-			// 如果是本次伤害致其倒地，则其当前血量+伤害量=300
-			// 如果不是，则说明攻击时已经倒地，则不统计本次友伤
-			if (vctHp + dmg != 300)
-				return;
+			isDead = true;
 		}
 
-		// 若不是对自己造成的伤害，则计入累计统计
+		// 若不是对自己造成的伤害，则计入友伤累计统计
 		if (attacker != victim)
 		{
 			hurtData[attacker.GetEntityIndex()].atk += dmg;
@@ -963,8 +960,9 @@ local isExistTime = false;
 			if (!tempTeamHurt.rawin(key))
 			{
 				tempTeamHurt[key] <- { dmg=0, attacker=attacker, atkName=attacker.GetPlayerName(),
-					victim=victim, vctName=victim.GetPlayerName(), isDead=false, isIncap=false };
+					victim=victim, vctName=victim.GetPlayerName(), isDead=false, isIncap=false  };
 			}
+			tempTeamHurt[key].isDead = isDead;
 			tempTeamHurt[key].dmg += dmg;
 			// 友伤发生后，0.5秒内同一人若未再对同一人造成友伤，则输出其造成的伤害
 			VSLib.Timers.AddTimerByName(key, 0.5, false, Timer_PrintTeamHurt, key);
@@ -982,19 +980,18 @@ local isExistTime = false;
 		else // 不是生还者且不是Tank，则为普通特感(此事件下不可能为witch)
 		{
 			if (vctHp < 0)
-				dmg += vctHp; // 修正溢出伤害
+			{
+				// 修正致死溢出伤害
+				dmg += vctHp;
+				if (dmg <= 0)
+					return;
+			}
 			hurtData[attacker.GetEntityIndex()].si += dmg;
 			hurtData[attacker.GetEntityIndex()].t_si += dmg;
 		}
 	}
 }
 ::LinEventHook("OnGameEvent_player_hurt", ::LinGe.HUD.OnGameEvent_player_hurt, ::LinGe.HUD);
-/*	Tank的击杀伤害与致队友倒地时的伤害存在溢出
-	没能发现太好修正方法，因为当上述两种情况发生时
-	已经无法获得其最后一刻的真实血量
-	除非时刻记录Tank和队友的血量，然后以此为准编写一套逻辑
-	但这样实在太浪费资源，且容易出现BUG
-*/
 
 // 提示一次友伤伤害并删除累积数据
 ::LinGe.HUD.Timer_PrintTeamHurt <- function (key)
@@ -1093,69 +1090,104 @@ local isExistTime = false;
 	attackerEntity = GetPlayerFromUserID(attacker);
 
 	if (dierEntity && dierEntity.IsSurvivor())
-	{
-		// 自杀时伤害类型为0
-		if (params.type == 0)
-			return;
+		return;
 
-		// 如果是友伤致其死亡
-		if (attackerEntity && attackerEntity.IsSurvivor())
-		{
-			local key = params.attacker + "_" + dier;
-			if (tempTeamHurt.rawin(key))
-				tempTeamHurt[key].isDead = true;
-		}
-	}
-	else
+	if (attackerEntity && attackerEntity.IsSurvivor())
 	{
-		if (attackerEntity && attackerEntity.IsSurvivor())
+		if (params.victimname == "Infected")
 		{
-			if (params.victimname == "Infected")
+			hurtData[attackerEntity.GetEntityIndex()].kci++;
+			hurtData[attackerEntity.GetEntityIndex()].t_kci++;
+			if (params.headshot)
 			{
-				hurtData[attackerEntity.GetEntityIndex()].kci++;
-				hurtData[attackerEntity.GetEntityIndex()].t_kci++;
-				if (params.headshot)
-				{
-					hurtData[attackerEntity.GetEntityIndex()].hci++;
-					hurtData[attackerEntity.GetEntityIndex()].t_hci++;
-				}
+				hurtData[attackerEntity.GetEntityIndex()].hci++;
+				hurtData[attackerEntity.GetEntityIndex()].t_hci++;
 			}
-			else
-			{
-				hurtData[attackerEntity.GetEntityIndex()].ksi++;
-				hurtData[attackerEntity.GetEntityIndex()].t_ksi++;
-				if (params.headshot)
-				{
-					hurtData[attackerEntity.GetEntityIndex()].hsi++;
-					hurtData[attackerEntity.GetEntityIndex()].t_hsi++;
-				}
-			}
-			// UpdateRankHUD();
 		}
+		else
+		{
+			hurtData[attackerEntity.GetEntityIndex()].ksi++;
+			hurtData[attackerEntity.GetEntityIndex()].t_ksi++;
+			if (params.headshot)
+			{
+				hurtData[attackerEntity.GetEntityIndex()].hsi++;
+				hurtData[attackerEntity.GetEntityIndex()].t_hsi++;
+			}
+		}
+		// UpdateRankHUD();
 	}
 }
 ::LinEventHook("OnGameEvent_player_death", ::LinGe.HUD.OnGameEvent_player_death, ::LinGe.HUD);
 
 // 事件：玩家倒地
+::LinGe.HUD.OnGameEvent_player_incapacitated_start <- function (params)
+{
+	if (!params.rawin("userid") || params.userid == 0)
+		return;
+
+	local attacker = null;
+	if (params.rawin("attacker")) // 如果是小丧尸或Witch等使玩家倒地，则无attacker
+        attacker = GetPlayerFromUserID(params.attacker);
+	if (null == attacker) // 攻击者无效
+		return;
+	if (!attacker.IsSurvivor()) // 攻击者不是生还者
+		return;
+
+    // 获取被攻击者实体
+	local victim = GetPlayerFromUserID(params.userid);
+	local vctHp = victim.GetHealth() + victim.GetHealthBuffer().tointeger();
+	local dmg = vctHp; // 伤害直接取被攻击者剩余hp
+
+	if (victim.IsSurvivor())
+	{
+        // 若不是对自己造成的伤害，则计入累计统计
+		if (attacker != victim)
+		{
+			hurtData[attacker.GetEntityIndex()].atk += dmg;
+			hurtData[attacker.GetEntityIndex()].t_atk += dmg;
+			hurtData[victim.GetEntityIndex()].vct += dmg;
+			hurtData[victim.GetEntityIndex()].t_vct += dmg;
+		}
+
+		// 若开启了友伤提示，则计入临时数据统计
+		if (Config.hurt.teamHurtInfo >= 1 && Config.hurt.teamHurtInfo <= 2)
+		{
+			local key = params.attacker + "_" + params.userid;
+            if (!tempTeamHurt.rawin(key))
+			{
+				tempTeamHurt[key] <- { dmg=0, attacker=attacker, atkName=attacker.GetPlayerName(),
+					victim=victim, vctName=victim.GetPlayerName(), isDead=false, isIncap=false };
+			}
+			tempTeamHurt[key].isIncap = true;
+			tempTeamHurt[key].dmg += dmg;
+			// 友伤发生后，0.5秒内同一人若未再对同一人造成友伤，则输出其造成的伤害
+			VSLib.Timers.AddTimerByName(key, 0.5, false, Timer_PrintTeamHurt, key);
+		}
+	}
+}
+::LinEventHook("OnGameEvent_player_incapacitated_start", ::LinGe.HUD.OnGameEvent_player_incapacitated_start, ::LinGe.HUD);
+
+// 事件：玩家倒地（仅处理tank死亡的致死伤害）
 ::LinGe.HUD.OnGameEvent_player_incapacitated <- function (params)
 {
 	if (!params.rawin("userid") || params.userid == 0)
 		return;
 
-	local player = GetPlayerFromUserID(params.userid);
-	local attackerEntity = null;
-	if (params.rawin("attacker")) // 如果是小丧尸或Witch等使玩家倒地，则无attacker
-		attackerEntity = GetPlayerFromUserID(params.attacker);
-	if (player.IsSurvivor())
-	{
-		// 如果是友伤致其倒地
-		if (attackerEntity && attackerEntity.IsSurvivor())
-		{
-			local key = params.attacker + "_" + params.userid;
-			if (tempTeamHurt.rawin(key))
-				tempTeamHurt[key].isIncap = true;
-		}
-	}
+	local attacker = null;
+	if (params.rawin("attacker"))
+        attacker = GetPlayerFromUserID(params.attacker);
+    if (null == attacker) // 攻击者无效
+		return;
+	if (!attacker.IsSurvivor()) // 攻击者不是生还者
+		return;
+
+	local victim = GetPlayerFromUserID(params.userid);
+	if (8 != victim.GetZombieType())
+		return;
+    local vctHp = victim.GetHealth();
+	local dmg = vctHp; // 伤害直接取被攻击者剩余hp
+	
+    hurtData[attacker.GetEntityIndex()].tank += dmg;
 }
 ::LinEventHook("OnGameEvent_player_incapacitated", ::LinGe.HUD.OnGameEvent_player_incapacitated, ::LinGe.HUD);
 
