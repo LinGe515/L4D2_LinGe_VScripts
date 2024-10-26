@@ -979,6 +979,11 @@ local isExistTime = false;
 		}
 		else // 不是生还者且不是Tank，则为普通特感(此事件下不可能为witch)
 		{
+			// 修正火焰对普通特感的缺量伤害
+			// 火焰伤害对特感会触发两种类型的伤害事件，当满足以下条件的火焰伤害事件触发时
+			// 实际伤害量总是事件提供的3倍，因此将其伤害量修正为3倍
+			if (params.weapon == "entityflame" && params.type == 268435464)
+				dmg *= 3;
 			if (vctHp < 0)
 			{
 				// 修正致死溢出伤害
