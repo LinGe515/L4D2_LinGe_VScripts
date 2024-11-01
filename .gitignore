@@ -5,6 +5,10 @@
 !/release/*-addoninfo.txt
 !/release/*-addonimage.jpg
 
+!/release/vpk/
+/release/vpk/*
+!/release/vpk/*.vpk
+
 /plugin/*-build
 
 /note.txt
