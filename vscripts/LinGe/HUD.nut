@@ -938,13 +938,14 @@ local isExistTime = false;
 			return;
 		vctHp += victim.GetHealthBuffer().tointeger();
 		local isDead = false;
-		if (vctHp < 0) // 致死伤害事件发生时，victim.IsDead()还不会为真，但血量会<0
+		if (vctHp <= 0) // 致死伤害事件发生时，victim.IsDead()还不会为真，但血量会<=0
 		{
+			isDead = true;
+			
 			// 修正致死溢出伤害
 			dmg += vctHp;
 			if (dmg <= 0)
 				return;
-			isDead = true;
 		}
 
 		// 若不是对自己造成的伤害，则计入友伤累计统计
