@@ -11,6 +11,16 @@ printl("[LinGe] Base 正在载入");
 ::LinGe.hostport <- Convars.GetFloat("hostport").tointeger();
 printl("[LinGe] 当前服务器端口 " + ::LinGe.hostport);
 
+// 地图结束后销毁本脚本
+local Last_OnShutdown = g_MapScript.ScriptMode_OnShutdown.bindenv(g_MapScript);
+g_MapScript.ScriptMode_OnShutdown <- function (reason, nextmap)
+{
+	delete ::LinGe;
+	Last_OnShutdown(reason, nextmap);
+	
+	printl("[LinGe] 回合结束，脚本已卸载");
+}
+
 // ---------------------------全局函数START-------------------------------------------
 // 主要用于调试
 ::LinGe.DebugPrintl <- function (str)
