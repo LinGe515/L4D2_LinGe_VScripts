@@ -1151,7 +1151,7 @@ else
 			if (Config.help.duration <= 0 || CheckSurvivor(pEnt, player))
 			{
 				// 如果不允许玩家状态标记，或者队友是健康的，则单独给发出标记的玩家提示血量
-				AddHint(pEnt, LINGE_NONE_ICON, "当前血量:" + ceil(pEnt.GetHealth() + pEnt.GetHealthBuffer()), -1,
+				AddHint(pEnt, LINGE_NONE_ICON, "当前血量:" + (pEnt.GetHealth() + pEnt.GetHealthBuffer().tointeger()), -1,
 					2.0, HINTMODE.SELFSHOW, player);
 			}
 		}
