@@ -916,7 +916,7 @@ local isExistTime = false;
 	if (params.dmg_health < 1)
 		return;
 
-	if (0 == params.type || 131072 == params.type) // 伤害类型为0或131072（tank倒地自损）
+	if (0 == params.type || 131072 == params.type) // 0为非正常伤害，131072为倒地状态触发的持续流血伤害（除了生还者，Tank倒地后也会触发该类伤害）
 		return;
 	local attacker = GetPlayerFromUserID(params.attacker); // 获得攻击者实体
 	if (null == attacker) // 攻击者无效
@@ -934,14 +934,14 @@ local isExistTime = false;
 	// 如果被攻击者是生还者则统计友伤数据
 	if (victim.IsSurvivor())
 	{
-		if (victim.IsDying() || victim.IsDead() || victim.IsIncapacitated())
+		if (victim.IsIncapacitated())
 			return;
 		vctHp += victim.GetHealthBuffer().tointeger();
 		local isDead = false;
 		if (vctHp <= 0) // 致死伤害事件发生时，victim.IsDead()还不会为真，但血量会<=0
 		{
 			isDead = true;
-			
+
 			// 修正致死溢出伤害
 			dmg += vctHp;
 			if (dmg <= 0)
@@ -977,7 +977,9 @@ local isExistTime = false;
 		// 如果是Tank 则将数据记录到临时Tank伤害数据记录
 		if (8 == victim.GetZombieType())
 		{
-			if (5000 == dmg) // 击杀Tank时会产生5000伤害事件，不知道为什么设计了这样的机制
+			// Tank血量为0后，不会立即死亡，而会进入Incapacitated状态，一两秒后再被系统131072类型的流血伤害杀死
+			// Incapacitated状态下，生还者有概率会对Tank造成非131072类型的鞭尸伤害，所以这里需进行一个判断屏蔽
+			if (victim.IsIncapacitated())
 				return;
 			hurtData[atkidx].tank += dmg;
 		}
