@@ -928,6 +928,9 @@ local isExistTime = false;
 	local victim = GetPlayerFromUserID(params.userid);
 	local vctHp = victim.GetHealth();
 	local dmg = params.dmg_health;
+	local atkidx = attacker.GetEntityIndex();
+	local vctidx = victim.GetEntityIndex();
+
 	// 如果被攻击者是生还者则统计友伤数据
 	if (victim.IsSurvivor())
 	{
@@ -947,10 +950,10 @@ local isExistTime = false;
 		// 若不是对自己造成的伤害，则计入友伤累计统计
 		if (attacker != victim)
 		{
-			hurtData[attacker.GetEntityIndex()].atk += dmg;
-			hurtData[attacker.GetEntityIndex()].t_atk += dmg;
-			hurtData[victim.GetEntityIndex()].vct += dmg;
-			hurtData[victim.GetEntityIndex()].t_vct += dmg;
+			hurtData[atkidx].atk += dmg;
+			hurtData[atkidx].t_atk += dmg;
+			hurtData[vctidx].vct += dmg;
+			hurtData[vctidx].t_vct += dmg;
 		}
 
 		// 若开启了友伤提示，则计入临时数据统计
@@ -975,7 +978,7 @@ local isExistTime = false;
 		{
 			if (5000 == dmg) // 击杀Tank时会产生5000伤害事件，不知道为什么设计了这样的机制
 				return;
-			hurtData[attacker.GetEntityIndex()].tank += dmg;
+			hurtData[atkidx].tank += dmg;
 		}
 		else // 不是生还者且不是Tank，则为普通特感(此事件下不可能为witch)
 		{
@@ -991,8 +994,8 @@ local isExistTime = false;
 				if (dmg <= 0)
 					return;
 			}
-			hurtData[attacker.GetEntityIndex()].si += dmg;
-			hurtData[attacker.GetEntityIndex()].t_si += dmg;
+			hurtData[atkidx].si += dmg;
+			hurtData[atkidx].t_si += dmg;
 		}
 	}
 }
@@ -1010,9 +1013,7 @@ local isExistTime = false;
 	{
 		if (info.attacker == info.victim)
 			vctName = "他自己";
-		text = "\x03" + atkName
-			+ "\x04 对 \x03" + vctName
-			+ "\x04 造成了 \x03" + info.dmg + "\x04 点伤害";
+		text = format("\x03%s\x04 对 \x03%s\x04 造成了 \x03%d\x04 点伤害", atkName, vctName, info.dmg);
 		if (info.isDead)
 		{
 			if (info.attacker == info.victim)
@@ -1035,7 +1036,7 @@ local isExistTime = false;
 		{
 			if (info.attacker.IsValid())
 			{
-				text = "\x04你对 \x03自己\x04 造成了 \x03" + info.dmg + "\x04 点伤害";
+				text = format("\x04你对 \x03自己\x04 造成了 \x03%d\x04 点伤害", info.dmg);
 				if (info.isDead)
 					text += "，并且死亡";
 				else if (info.isIncap)
@@ -1047,8 +1048,7 @@ local isExistTime = false;
 		{
 			if (info.attacker.IsValid())
 			{
-				text = "\x04你对 \x03" + vctName
-					+ "\x04 造成了 \x03" + info.dmg + "\x04 点伤害";
+				text = format("\x03你\x04 对 \x03%s\x04 造成了 \x03%d\x04 点伤害", vctName, info.dmg);
 				if (info.isDead)
 					text += "，并且杀死了他";
 				else if (info.isIncap)
@@ -1058,8 +1058,7 @@ local isExistTime = false;
 
 			if (info.victim.IsValid())
 			{
-				text = "\x03" + atkName
-				+ "\x04 对你造成了 \x03" + info.dmg + "\x04 点伤害";
+				text = format("\x03%s\x04 对 \x03你\x04 造成了 \x03%d\x04 点伤害", atkName, info.dmg);
 				if (info.isDead)
 					text += "，并且杀死了你";
 				else if (info.isIncap)
@@ -1099,27 +1098,28 @@ local isExistTime = false;
 
 	if (attackerEntity && attackerEntity.IsSurvivor())
 	{
+		local atkidx = attackerEntity.GetEntityIndex();
 		if (params.victimname == "Infected")
 		{
-			hurtData[attackerEntity.GetEntityIndex()].kci++;
-			hurtData[attackerEntity.GetEntityIndex()].t_kci++;
+			hurtData[atkidx].kci++;
+			hurtData[atkidx].t_kci++;
 			if (params.headshot)
 			{
-				hurtData[attackerEntity.GetEntityIndex()].hci++;
-				hurtData[attackerEntity.GetEntityIndex()].t_hci++;
+				hurtData[atkidx].hci++;
+				hurtData[atkidx].t_hci++;
 			}
 		}
 		else
 		{
-			hurtData[attackerEntity.GetEntityIndex()].ksi++;
-			hurtData[attackerEntity.GetEntityIndex()].t_ksi++;
+			hurtData[atkidx].ksi++;
+			hurtData[atkidx].t_ksi++;
 			if (params.headshot)
 			{
-				hurtData[attackerEntity.GetEntityIndex()].hsi++;
-				hurtData[attackerEntity.GetEntityIndex()].t_hsi++;
+				hurtData[atkidx].hsi++;
+				hurtData[atkidx].t_hsi++;
 			}
 		}
-		// UpdateRankHUD();
+		// UpdateRankHUD(); // 每次击杀都更新排行榜的话，在数据处理量较大时可能造成游戏卡顿，所以这里不更新
 	}
 }
 ::LinEventHook("OnGameEvent_player_death", ::LinGe.HUD.OnGameEvent_player_death, ::LinGe.HUD);
@@ -1142,16 +1142,18 @@ local isExistTime = false;
 	local victim = GetPlayerFromUserID(params.userid);
 	local vctHp = victim.GetHealth() + victim.GetHealthBuffer().tointeger();
 	local dmg = vctHp; // 伤害直接取被攻击者剩余hp
+	local atkidx = attacker.GetEntityIndex();
+	local vctidx = victim.GetEntityIndex();
 
 	if (victim.IsSurvivor())
 	{
         // 若不是对自己造成的伤害，则计入累计统计
 		if (attacker != victim)
 		{
-			hurtData[attacker.GetEntityIndex()].atk += dmg;
-			hurtData[attacker.GetEntityIndex()].t_atk += dmg;
-			hurtData[victim.GetEntityIndex()].vct += dmg;
-			hurtData[victim.GetEntityIndex()].t_vct += dmg;
+			hurtData[atkidx].atk += dmg;
+			hurtData[atkidx].t_atk += dmg;
+			hurtData[vctidx].vct += dmg;
+			hurtData[vctidx].t_vct += dmg;
 		}
 
 		// 若开启了友伤提示，则计入临时数据统计
@@ -1189,10 +1191,8 @@ local isExistTime = false;
 	local victim = GetPlayerFromUserID(params.userid);
 	if (8 != victim.GetZombieType())
 		return;
-    local vctHp = victim.GetHealth();
-	local dmg = vctHp; // 伤害直接取被攻击者剩余hp
 	
-    hurtData[attacker.GetEntityIndex()].tank += dmg;
+    hurtData[attacker.GetEntityIndex()].tank += victim.GetHealth(); // 致死伤害取 Tank 剩余hp
 }
 ::LinEventHook("OnGameEvent_player_incapacitated", ::LinGe.HUD.OnGameEvent_player_incapacitated, ::LinGe.HUD);
 
