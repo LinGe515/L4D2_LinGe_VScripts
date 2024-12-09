@@ -85,7 +85,7 @@ if (::LinGe.Hint.Config.limit > 8)
 if (::LinGe.Hint.Config.limit > 0) {
 
 enum HINTMODE {
-	DOMINATE = 0, // 适用队友被控
+	DOMINATE, // 适用队友被控
 	REVIVE, // 适用于队友倒地、挂边
 	DYING, // 适用于队友黑白
 	SPECIAL, // 适用于显示在特感上的标记
