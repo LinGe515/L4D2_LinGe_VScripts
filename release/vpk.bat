@@ -28,7 +28,7 @@ xcopy %main%\LinGe %output%\%all%\scripts\vscripts\LinGe /E /I
 copy %main%\director_base_addon.nut %output%\%all%\scripts\vscripts\director_base_addon.nut
 copy %main%\scriptedmode_addon.nut %output%\%all%\scripts\vscripts\scriptedmode_addon.nut
 %vpk% %output%\%all%
-move %output%\%all%.vpk "%output%\%all_name%.vpk"
+copy %output%\%all%.vpk "%output%\%all_name%.vpk"
 
 :: Base
 mkdir %output%\%Base%\scripts\vscripts\LinGe
@@ -41,7 +41,7 @@ xcopy %main%\LinGe\VSLib %output%\%Base%\scripts\vscripts\LinGe\VSLib /E /I
 copy %main%\director_base_addon.nut %output%\%Base%\scripts\vscripts\director_base_addon.nut
 copy %main%\scriptedmode_addon.nut %output%\%Base%\scripts\vscripts\scriptedmode_addon.nut
 %vpk% %output%\%Base%
-move %output%\%Base%.vpk "%output%\%Base_name% %Base%.vpk"
+copy %output%\%Base%.vpk "%output%\%Base_name% %Base%.vpk"
 
 setlocal enabledelayedexpansion
 :: ×ÓÏîÄ¿
@@ -53,7 +53,7 @@ for /l %%i in (0,1,4) do (
 	copy !obj!-addonimage.jpg		%output%\!obj!\addonimage.jpg
 	copy %main%\LinGe\!obj!.nut 	%output%\!obj!\scripts\vscripts\LinGe\!obj!.nut
 	%vpk% %output%\!obj!
-	move %output%\!obj!.vpk "%output%\!vpk_name! !obj!.vpk"
+	copy %output%\!obj!.vpk "%output%\!vpk_name! !obj!.vpk"
 )
 
 pause

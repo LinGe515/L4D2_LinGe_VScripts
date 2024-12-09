@@ -8,6 +8,13 @@
 !/release/vpk/
 /release/vpk/*
 !/release/vpk/*.vpk
+/release/vpk/base.vpk
+/release/vpk/hint.vpk
+/release/vpk/hud.vpk
+/release/vpk/linge_vscripts.vpk
+/release/vpk/moresi.vpk
+/release/vpk/rewardhp.vpk
+/release/vpk/zs.vpk
 
 /plugin/*-build
 
