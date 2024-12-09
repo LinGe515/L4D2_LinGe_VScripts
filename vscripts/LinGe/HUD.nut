@@ -880,11 +880,6 @@ local isExistTime = false;
 	local uniqueID = ::LinGe.SteamIDCastUniqueID(steamid);
 	local idx = playersIndex.find(entityIndex);
 
-	if (isHuman)
-	{
-		UpdateRankHUD();
-	}
-
 	if ( (params.disconnect || 3 == params.team) && null != idx )
 	{
 		playersIndex.remove(idx);
@@ -901,6 +896,11 @@ local isExistTime = false;
 		{
 			hurtData[entityIndex] = clone hurtData_bak[uniqueID];
 		}
+	}
+
+	if (isHuman || Config.hurt.HUDRankShowBot)
+	{
+		UpdateRankHUD();
 	}
 }
 ::LinEventHook("OnGameEvent_player_team", ::LinGe.HUD.OnGameEvent_player_team, ::LinGe.HUD);
